@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="1a76f7f8-10a3-47bf-8b3f-6e0a8d7c3569" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="777296c3-c1bc-428a-b502-4a772eabb2fd" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="root" database="mulesoftdb" />
+	</db:config>
+	<http:request-config 
+    name="HTTP_Request_config" 
+    doc:name="HTTP Request config">
+    <http:request-connection 
+        host="localhost" 
+        port="8082"
+        protocol="HTTP">
+    </http:request-connection>
+</http:request-config>
+	<flow name="testpocFlow" doc:id="489682da-5b54-4a47-a17f-f357dac3a738" >
+		<http:listener doc:name="Listener" doc:id="82990fd9-c681-40b3-a22b-78477b227249" config-ref="HTTP_Listener_config" path="/database"/>
+		<ee:transform doc:name="Transform Message" doc:id="cf065bfd-db18-4b40-9022-7c374e6d35c0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+//payload.orders map (order) -> {
+//    customer_name: order.customer_name,
+//    product: order.product,
+//    amount: order.amount,
+//    status: order.status default "PENDING"
+//}
+{
+  test: ("2026-04-16T16:11:40+01:00" as DateTime >> "Europe/Berlin" >> "UTC") 
+         as String {format: "HH:mm:ss"}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<!-- [STUDIO:"HTTP Request"]<http:request 
+    method="POST"
+    path="/database"
+    config-ref="HTTP_Request_config"
+    responseTimeout="15000"
+    followRedirects="true"
+    doc:name="HTTP Request"
+    doc:id="e6a4c97c-8c07-4c55-8f3c-bbb9b47111ae">
+    
+    <!&#45;&#45; Response validator — only 200,201 = success &#45;&#45;>
+    <http:response-validator>
+        <http:success-status-code-validator 
+            values="200,201"/>
+    </http:response-validator>
+    
+    <!&#45;&#45; Headers &#45;&#45;>
+    <ee:repeatable-file-store-stream bufferUnit="GB" />
+			<reconnect />
+			<http:headers><![CDATA[#[output application/java
+&#45;&#45;-
+{
+    "Content-Type" : "application/json"
+}&#93;&#93;&#93;></http:headers>
+
+</http:request> [STUDIO] --><logger level="INFO" doc:name="Logger" doc:id="bc804ca9-0337-475c-af5d-e31ba4241eae" message="Inserting in the DB: #[payload]"/>
+		<db:bulk-insert doc:name="Bulk insert" doc:id="60dab313-234e-45ca-a148-726e51ead11d" config-ref="Database_Config" transactionalAction="ALWAYS_JOIN">
+			<db:sql><![CDATA[INSERT INTO orders (customer_name, product, amount, status) 
+VALUES (:customer_name, :product, :amount, :status)]]></db:sql>
+			<db:parameter-types />
+		</db:bulk-insert>
+		<ee:transform doc:name="Transform Message" doc:id="a4befcec-4d81-46a8-9e4e-c53aa016ccb6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="f8394064-029e-47b0-93aa-6952ff8271ae" message="Data has been created in the database: #[payload]"/>
+	</flow>
+</mule>

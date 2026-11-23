@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="error_hamdlerError_Handler" doc:id="b5e41d19-b988-481a-ba61-c88d55662a63" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="55aa5c5e-c3a4-4774-afcb-040f161eb835" type="ANY">
+			<logger level="INFO" doc:name="Logger" doc:id="4f906731-3510-4a07-ba13-3ca05b33a8e8" message="Error Response Message : #[error.errorMessage.payload default error.description]"/>
+			<set-variable value='#[if (error.errorType.identifier == "BAD_REQUEST") 400 else if (error.errorType.identifier == "NOT_FOUND") 404 else if (error.errorType.identifier == "METHOD_NOT_ALLOWED") 405 else if (error.errorType.identifier == "NOT_ACCEPTABLE") 406 else if (error.errorType.identifier == "UNSUPPORTED_MEDIA_TYPE") 415 else if (error.errorType.identifier == "NOT_IMPLEMENTED") 501 else if (error.errorType.identifier == "GATEWAY_TIMEOUT") 504 else if (error.errorType.identifier == "BAD_GATEWAY") 502 else 500]' doc:name="Set Variable" doc:id="3ff8e9f4-feee-4450-a2c1-0b53e976070e" variableName="vHttpStatusCode"/>
+			<ee:transform doc:name="Transform Message" doc:id="26f536ca-4eae-4b28-95fb-43252a7054e6" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    errors: [{
+        errorCode: vars.vHttpStatusCode,
+        title: error.errorType.identifier,
+        errorMessage: [error.description replace('"')  with('')],
+        timeStamp: now(),
+        domain: app.name,
+        traceId: correlationId
+        
+    }]
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="INFO" doc:name="Logger" doc:id="476e9fa1-e001-44e3-b51c-e77028084c45" message="error response #[payload]"/>
+		</on-error-propagate>
+	</error-handler>
+</mule>
